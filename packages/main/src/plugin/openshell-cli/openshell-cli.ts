@@ -294,7 +294,7 @@ export class OpenshellCli {
         args.push('--config', `${key}=${value}`);
       }
     }
-    await this.runCli(args, { redact: true, env });
+    await this.runCli(args, { env });
   }
 
   // ── helpers ───────────────────────────────────────────────────────

@@ -788,8 +788,7 @@ describe('createProvider', () => {
 
     const loggedMessage = logSpy.mock.calls[0]?.[0] as string;
     expect(loggedMessage).not.toContain('sk-secret-123');
-    expect(loggedMessage).not.toContain('gpt-4');
-    expect(loggedMessage).toContain('***');
+    expect(loggedMessage).toContain('gpt-4');
   });
 
   test('rejects when CLI fails', async () => {

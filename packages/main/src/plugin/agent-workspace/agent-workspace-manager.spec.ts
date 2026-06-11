@@ -886,11 +886,15 @@ describe('ensureModelSecret', () => {
     expect(safeStorageRegistry.getExtensionStorage).toHaveBeenCalledWith('kaiden.cursor');
     expect(extensionStorageMock.get).toHaveBeenCalledWith('cursor:conn-1:token');
     expect(secretManager.create).toHaveBeenCalledWith({
-      name: 'my-workspace-cursor-token',
+      name: 'my-workspace-cursor',
       type: 'cursor',
-      value: 'actual-api-key',
+      value: {
+        credentials: {
+          token: 'actual-api-key',
+        },
+      },
     });
-    expect(options.secrets).toContain('my-workspace-cursor-token');
+    expect(options.secrets).toContain('my-workspace-cursor');
     expect(providerRegistry.getInferenceConnectionCredentials).not.toHaveBeenCalled();
   });
 
@@ -1022,7 +1026,7 @@ describe('ensureModelSecret', () => {
     };
     await manager.ensureModelSecret(options);
 
-    expect(secretManager.create).toHaveBeenCalledWith(expect.objectContaining({ name: 'my-project-mistral-token' }));
+    expect(secretManager.create).toHaveBeenCalledWith(expect.objectContaining({ name: 'my-project-mistral' }));
   });
 });
 

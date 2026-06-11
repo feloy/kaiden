@@ -48,7 +48,7 @@ import type { IConfigurationNode } from '/@api/configuration/models.js';
 import { IConfigurationRegistry } from '/@api/configuration/models.js';
 import type { GatewaySandboxes } from '/@api/openshell-gateway-info.js';
 import type { InferenceConnectionCredentials } from '/@api/provider-info.js';
-import type { SecretCreateOptions } from '/@api/secret-info.js';
+import type { SecretCreateOptions, SecretValue } from '/@api/secret-info.js';
 
 /**
  * Manages agent workspaces by delegating to the `kdn` CLI.
@@ -256,6 +256,7 @@ export class AgentWorkspaceManager implements Disposable {
 
     const extensionStorage = this.safeStorageRegistry.getExtensionStorage(info.extensionId);
 
+    const value: SecretValue = { credentials: {} };
     for (const propertyName of passwordKeys) {
       const secretRefName = config.get<string>(propertyName);
       if (!secretRefName) continue;
@@ -264,11 +265,14 @@ export class AgentWorkspaceManager implements Disposable {
       if (!actualValue) continue;
 
       const shortPropertyName = propertyName.split('.').pop()!;
-      const secretName = `${workspaceName}-${secretType}-${shortPropertyName}`;
+      value.credentials[shortPropertyName] = actualValue;
+    }
+    if (Object.keys(value.credentials).length > 0) {
+      const secretName = `${workspaceName}-${secretType}`;
       await this.secretManager.create({
         name: secretName,
         type: secretType,
-        value: actualValue,
+        value: value,
       });
 
       options.secrets = [...new Set([...(options.secrets ?? []), secretName])];
