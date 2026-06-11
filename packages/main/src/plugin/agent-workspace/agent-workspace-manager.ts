@@ -30,6 +30,7 @@ import { IPCHandle, WebContentsType } from '/@/plugin/api.js';
 import { FilesystemMonitoring } from '/@/plugin/filesystem-monitoring.js';
 import { KdnCli } from '/@/plugin/kdn-cli/kdn-cli.js';
 import { OpenshellCli } from '/@/plugin/openshell-cli/openshell-cli.js';
+import { OpenshellImageBuilder } from '/@/plugin/openshell-cli/openshell-image-builder.js';
 import { ProviderRegistry } from '/@/plugin/provider-registry.js';
 import { SafeStorageRegistry } from '/@/plugin/safe-storage/safe-storage-registry.js';
 import { SecretManager } from '/@/plugin/secret-manager/secret-manager.js';
@@ -84,6 +85,8 @@ export class AgentWorkspaceManager implements Disposable {
     private readonly openshellCli: OpenshellCli,
     @inject(SafeStorageRegistry)
     private readonly safeStorageRegistry: SafeStorageRegistry,
+    @inject(OpenshellImageBuilder)
+    private readonly imageBuilderCli: OpenshellImageBuilder,
   ) {}
 
   async getCliInfo(): Promise<CliInfo> {
@@ -102,7 +105,9 @@ export class AgentWorkspaceManager implements Disposable {
       }
 
       await this.ensureModelSecret(options);
-      const workspaceId = await this.kdnCli.createWorkspace(options);
+      const workspaceId = process.env['KAIDEN_OPENSHELL']
+        ? await this.createOpenshell(options)
+        : await this.kdnCli.createWorkspace(options);
       this.apiSender.send('agent-workspace-update');
       task.status = 'success';
       return workspaceId;
@@ -114,6 +119,47 @@ export class AgentWorkspaceManager implements Disposable {
     } finally {
       task.state = 'completed';
     }
+  }
+
+  private sanitizeImageTag(name: string): string {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, '-')
+      .split('-')
+      .filter(Boolean)
+      .join('-');
+  }
+
+  private async createOpenshell(options: AgentWorkspaceCreateOptions): Promise<AgentWorkspaceId> {
+    const connectionInfo = options.model
+      ? this.providerRegistry.getInferenceConnectionCredentials(options.model)
+      : undefined;
+
+    const modelName = options.model?.split('::')[1];
+    const inference = connectionInfo?.llmMetadataName;
+    const endpoint = connectionInfo?.endpoint;
+
+    await this.kdnCli.writeWorkspaceConfig(options);
+
+    const sandboxName = options.name ?? basename(options.sourcePath);
+    const imageTag = `kaiden-workspace-${this.sanitizeImageTag(sandboxName)}:latest`;
+
+    await this.imageBuilderCli.buildImage(imageTag, {
+      agent: options.agent,
+      model: modelName,
+      inference,
+      endpoint,
+      cwd: options.sourcePath,
+    });
+
+    await this.openshellCli.createSandbox({
+      name: sandboxName,
+      from: imageTag,
+      providers: options.secrets,
+      labels: { 'ai.openkaiden.kaiden.workspace': Buffer.from(options.sourcePath).toString('base64url') },
+    });
+
+    return { id: sandboxName };
   }
 
   async checkWorkspaceConfigExists(sourcePath: string): Promise<boolean> {
