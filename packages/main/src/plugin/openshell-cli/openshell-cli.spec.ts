@@ -252,7 +252,11 @@ describe('createSandbox', () => {
 
     await openshellCli.createSandbox({ noTty: true, command: ['true'] });
 
-    expect(exec.exec).toHaveBeenCalledWith(OPENSHELL_CLI_PATH, ['sandbox', 'create', '--no-tty', '--', 'true']);
+    expect(exec.exec).toHaveBeenCalledWith(
+      OPENSHELL_CLI_PATH,
+      ['sandbox', 'create', '--no-tty', '--', 'true'],
+      undefined,
+    );
   });
 
   test('rejects when CLI fails', async () => {
