@@ -122,12 +122,13 @@ export class AgentWorkspaceManager implements Disposable {
   }
 
   private sanitizeImageTag(name: string): string {
-    return name
+    const sanitized = name
       .toLowerCase()
       .replace(/[^a-z0-9-]+/g, '-')
       .split('-')
       .filter(Boolean)
       .join('-');
+    return sanitized || 'workspace';
   }
 
   private async createOpenshell(options: AgentWorkspaceCreateOptions): Promise<AgentWorkspaceId> {

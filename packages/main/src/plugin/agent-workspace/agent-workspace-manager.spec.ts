@@ -454,6 +454,13 @@ describe('create – OpenShell mode', () => {
       }),
     );
   });
+
+  test('falls back to "workspace" image tag component when name sanitizes to empty', async () => {
+    const options = { ...defaultOptions, name: '!!!' };
+    await manager.create(options);
+
+    expect(imageBuilderCli.buildImage).toHaveBeenCalledWith('kaiden-workspace-workspace:latest', expect.any(Object));
+  });
 });
 
 describe('checkWorkspaceConfigExists', () => {
