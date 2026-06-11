@@ -157,6 +157,8 @@ export class AgentWorkspaceManager implements Disposable {
       from: imageTag,
       providers: options.secrets,
       labels: { 'ai.openkaiden.kaiden.workspace': Buffer.from(options.sourcePath).toString('base64url') },
+      noTty: true,
+      command: ['true'],
     });
 
     return { id: sandboxName };

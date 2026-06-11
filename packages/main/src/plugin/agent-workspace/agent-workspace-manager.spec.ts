@@ -399,6 +399,8 @@ describe('create – OpenShell mode', () => {
       from: 'kaiden-workspace-my-sandbox:latest',
       providers: ['my-secret'],
       labels: { 'ai.openkaiden.kaiden.workspace': Buffer.from('/tmp/my-project').toString('base64url') },
+      noTty: true,
+      command: ['true'],
     });
   });
 
