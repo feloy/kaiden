@@ -47,6 +47,7 @@ describe('createSecret', () => {
   };
 
   test('delegates to openshellCli.createProvider and returns the secret name', async () => {
+    vi.mocked(openshellCli.listProviders).mockResolvedValue([]);
     vi.mocked(openshellCli.createProvider).mockResolvedValue(undefined);
 
     const result = await adapter.createSecret(defaultOptions);
@@ -59,7 +60,17 @@ describe('createSecret', () => {
     expect(result).toEqual({ name: 'my-secret' });
   });
 
+  test('reuses an existing provider when the name matches', async () => {
+    vi.mocked(openshellCli.listProviders).mockResolvedValue([{ name: 'my-secret', type: 'github' }]);
+
+    const result = await adapter.createSecret(defaultOptions);
+
+    expect(openshellCli.createProvider).not.toHaveBeenCalled();
+    expect(result).toEqual({ name: 'my-secret' });
+  });
+
   test('rejects when openshellCli.createProvider fails', async () => {
+    vi.mocked(openshellCli.listProviders).mockResolvedValue([]);
     vi.mocked(openshellCli.createProvider).mockRejectedValue(new Error('provider type not supported'));
 
     await expect(adapter.createSecret(defaultOptions)).rejects.toThrow('provider type not supported');

@@ -222,6 +222,7 @@ describe('KAIDEN_OPENSHELL backend switching', () => {
   });
 
   test('delegates create to openshellAdapter when KAIDEN_OPENSHELL is set', async () => {
+    vi.mocked(openshellCli.listProviders).mockResolvedValue([]);
     vi.mocked(openshellCli.createProvider).mockResolvedValue(undefined);
 
     const result = await manager.create(defaultOptions);
@@ -271,6 +272,7 @@ describe('KAIDEN_OPENSHELL backend switching', () => {
   });
 
   test('still emits secret-manager-update on create', async () => {
+    vi.mocked(openshellCli.listProviders).mockResolvedValue([]);
     vi.mocked(openshellCli.createProvider).mockResolvedValue(undefined);
 
     await manager.create(defaultOptions);

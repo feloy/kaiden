@@ -49,6 +49,15 @@ export class OpenshellSecretAdapter implements SecretCliBackend {
     if (typeof options.value === 'string') {
       throw new Error('options.value must be a record for Openshell');
     }
+
+    // Reuse an existing provider with the same name rather than re-creating it.
+    // The CLI may normalise the type string (e.g. "claude" → "claude-code"), so
+    // type comparison is unreliable; name alone is sufficient to identify the provider.
+    const existingProviders = await this.openshellCli.listProviders();
+    if (existingProviders.some(p => p.name === options.name)) {
+      return { name: options.name };
+    }
+
     await this.openshellCli.createProvider({
       name: options.name,
       type: options.type,
