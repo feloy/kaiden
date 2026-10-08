@@ -79,7 +79,7 @@ export class OpenAI implements Disposable {
           baseURL: this.resolveBaseURL(entry.baseURL),
         });
       } catch (err: unknown) {
-        console.error(`openai: failed to restore connection for baseURL ${entry.baseURL}`, err);
+        console.error(`openai: failed to restore connection ${entry.id} for baseURL ${entry.baseURL}`, err);
       }
     }
   }
@@ -233,7 +233,14 @@ export class OpenAI implements Disposable {
     const baseURL = this.resolveBaseURL(params['openai.factory.baseURL']);
 
     const stored = await this.getStoredConnections();
-    if (stored.some(c => c.apiKey === apiKey && this.resolveBaseURL(c.baseURL) === baseURL)) {
+    if (
+      stored.some(
+        c =>
+          c.apiKey === apiKey &&
+          (c.baseURL === undefined || typeof c.baseURL === 'string') &&
+          this.resolveBaseURL(c.baseURL) === baseURL,
+      )
+    ) {
       throw new Error(`connection already exists for baseURL ${baseURL}`);
     }
 

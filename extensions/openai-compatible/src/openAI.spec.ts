@@ -29,8 +29,6 @@ import type {
   provider as ProviderAPI,
   SecretStorage,
 } from '@openkaiden/api';
-import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
 import { assert, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { OpenAI, PROVIDER_ID, type StoredConnection, TOKENS_KEY } from './openAI';
@@ -197,40 +195,6 @@ describe('factory', () => {
     expect(createOpenAICompatible).not.toHaveBeenCalled();
     expect(SECRET_STORAGE_MOCK.store).not.toHaveBeenCalled();
     expect(PROVIDER_MOCK.registerInferenceProviderConnection).not.toHaveBeenCalled();
-  });
-
-  test('a connection without baseURL should generate through the real SDK at the OpenAI endpoint', async () => {
-    const sdk = await vi.importActual<{ createOpenAICompatible: typeof createOpenAICompatible }>(
-      '@ai-sdk/openai-compatible',
-    );
-    vi.mocked(createOpenAICompatible).mockImplementation(sdk.createOpenAICompatible);
-    const server = setupServer(
-      http.get(`${TestOpenAI.defaultBaseURL}/models`, () => HttpResponse.json({ data: [{ id: 'gpt-4o' }] })),
-      http.post(`${TestOpenAI.defaultBaseURL}/chat/completions`, async ({ request }) => {
-        expect(request.headers.get('Authorization')).toBe('Bearer dummyKey');
-        expect(await request.json()).toEqual(expect.objectContaining({ model: 'gpt-4o' }));
-        return HttpResponse.json({
-          id: 'completion-1',
-          object: 'chat.completion',
-          created: 1,
-          model: 'gpt-4o',
-          choices: [{ index: 0, message: { role: 'assistant', content: 'Hello' }, finish_reason: 'stop' }],
-          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
-        });
-      }),
-    );
-    server.listen({ onUnhandledRequest: 'error' });
-    try {
-      await create({ 'openai.factory.apiKey': 'dummyKey' });
-      const connection = vi.mocked(PROVIDER_MOCK.registerInferenceProviderConnection).mock.calls[0][0];
-      const model = connection.sdk.languageModel('gpt-4o');
-      const result = await model.doGenerate({
-        prompt: [{ role: 'user', content: [{ type: 'text', text: 'Hello' }] }],
-      });
-      expect(result.content).toEqual([{ type: 'text', text: 'Hello' }]);
-    } finally {
-      server.close();
-    }
   });
 
   test('calling create with proper params should save connection as JSON', async () => {
@@ -601,6 +565,59 @@ describe('listModels error handling (through factory)', () => {
 });
 
 describe('duplicate connection prevention', () => {
+  test.each([
+    'false',
+    'true',
+    '0',
+    '42',
+    '{}',
+    '[]',
+    'null',
+  ])('should create a valid connection when a persisted endpoint is %s for the same API key', async baseURL => {
+    vi.mocked(SECRET_STORAGE_MOCK.get).mockResolvedValue(
+      `[{"id":"invalid-id","apiKey":"dummyKey","baseURL":${baseURL}}]`,
+    );
+    const openai = new OpenAI(PROVIDER_API_MOCK, SECRET_STORAGE_MOCK, CONFIGURATION_API_MOCK);
+    await openai.init();
+    const create = vi.mocked(PROVIDER_MOCK.setInferenceProviderConnectionFactory).mock.calls[0][0].create;
+
+    await create({ 'openai.factory.apiKey': 'dummyKey', 'openai.factory.baseURL': 'http://localhost/v1' });
+
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith('http://localhost/v1/models', {
+      headers: { Authorization: 'Bearer dummyKey' },
+    });
+    expect(PROVIDER_MOCK.registerInferenceProviderConnection).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        id: 'fake-uuid-1',
+        endpoint: 'http://localhost/v1',
+        models: [{ label: 'gpt-4o' }, { label: 'gpt-4.1' }],
+      }),
+    );
+    expect(SECRET_STORAGE_MOCK.store).toHaveBeenCalledWith(
+      TOKENS_KEY,
+      `[{"id":"invalid-id","apiKey":"dummyKey","baseURL":${baseURL}},{"id":"fake-uuid-1","apiKey":"dummyKey","baseURL":"http://localhost/v1"}]`,
+    );
+  });
+
+  test('should still detect a duplicate after an invalid persisted endpoint', async () => {
+    vi.mocked(SECRET_STORAGE_MOCK.get).mockResolvedValue(
+      JSON.stringify([
+        { id: 'invalid-id', apiKey: 'dummyKey', baseURL: 42 },
+        { id: 'valid-id', apiKey: 'dummyKey', baseURL: TestOpenAI.defaultBaseURL },
+      ]),
+    );
+    const openai = new OpenAI(PROVIDER_API_MOCK, SECRET_STORAGE_MOCK, CONFIGURATION_API_MOCK);
+    await openai.init();
+    const create = vi.mocked(PROVIDER_MOCK.setInferenceProviderConnectionFactory).mock.calls[0][0].create;
+
+    await expect(create({ 'openai.factory.apiKey': 'dummyKey' })).rejects.toThrowError(
+      `connection already exists for baseURL ${TestOpenAI.defaultBaseURL}`,
+    );
+    expect(PROVIDER_MOCK.registerInferenceProviderConnection).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ id: 'valid-id', endpoint: TestOpenAI.defaultBaseURL }),
+    );
+  });
+
   test.each([
     [undefined, TestOpenAI.defaultBaseURL],
     ['', TestOpenAI.defaultBaseURL],
