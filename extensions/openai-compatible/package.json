@@ -17,7 +17,7 @@
         "openai.factory.baseURL": {
           "type": "string",
           "scope": "InferenceProviderConnectionFactory",
-          "description": "baseURL"
+          "description": "baseURL (leave empty to use the OpenAI API)"
         },
         "openai.factory.apiKey": {
           "type": "string",
@@ -53,6 +53,7 @@
   },
   "devDependencies": {
     "mkdirp": "^3.0.1",
+    "msw": "^2.12.7",
     "vite": "^7.1.2",
     "vitest": "^4.0.10"
   }
